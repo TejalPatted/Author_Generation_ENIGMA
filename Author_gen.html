@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+    </head>
+    <body>
+        <form name="form1">
+            <input type="radio" name="format_pref" value="alphabetically">
+            Sort alphabetically<br>
+            <input type="radio" name="format_pref" value="hierarchy" checked>
+            Sort by hierarchy<br>
+        </form>
+        <button onclick="gen_clicked()">Generate List</button>
+        <div class="panel panel-default">
+            <div class="panel-heading">Author list</div>
+            <div class="panel-body" id="Panel_1"></div>
+        </div>
+        <div class="panel panel-default">
+            <div class="panel-heading">Affiliation List</div>
+            <div class="panel-body"></div>
+            <ol id="Affiliations"></ol>
+        </div>
+        <!-- <ol id="Affiliations"></ol> -->
+        <div class="panel panel-default">
+            <div class="panel-heading">Contribution</div>
+            <div class="panel-body" id="Panel_2"></div>
+        </div>
+        
+        <script src="http://ajax.aspnetcdn.com/ajax/jquery/jquery-1.7.js"></script>
+        <script>
+            
+            var actual_JSON = {};
+            var hierarchy = ["Junior Lead", "Spl_Contributor", "Web developer", "Data Analyst", "PI", "Senior Lead"];
+            var author_list = {};
+            var affiliation_list = [];
+
+            function gen_clicked() {
+                for (var i = 0; i < form1.getElementsByTagName('input').length; i++) {
+                    if (document.getElementsByName("format_pref")[i].checked) {
+                        val = document.getElementsByName("format_pref")[i].value
+                    }
+                }
+                if (val == "hierarchy") {
+                    sort_hierarchy()
+                } else if (val == "alphabetically") {
+                    sort_alpha()
+                }
+            }
+
+            function sort_hierarchy() {
+                // Arrange the authors in each category alphabetically
+                var act = "";
+                var temp = [];
+                // To check if affiliation is displayed; indicating 1st execution of application is complete
+                if (document.getElementsByTagName("li").length == 0) {
+                    initial_datasort();
+                }
+
+                for (j = 0; j < hierarchy.length; j++) {
+                    author_list[hierarchy[j]].sort(function(a, b) {
+                        return ( a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)) ;
+                    })
+                    // Format the authors in display format
+                    for (k = 0; k < author_list[hierarchy[j]].length; k++) {
+                        temp = ""
+                        for (i = 0; i < author_list[hierarchy[j]][k][3].length; i++) {
+                            temp = temp.concat(affiliation_list.indexOf(author_list[hierarchy[j]][k][3][i].trim()) + 1, " , ");
+                        }
+                        temp = temp.slice(0, -2)
+                        act = act.concat(author_list[hierarchy[j]][k][0] + " " + author_list[hierarchy[j]][k][2] + "<sup>" + temp + "</sup>" + ", ")
+
+                    }
+                }
+                // To remove last comma
+                act = act.slice(0, -2)
+                document.getElementById("Panel_1").innerHTML = act;
+            }
+            function sort_alpha() {
+                var act = "";
+                var temp = [];
+                // Check the type of sorting needed
+
+                var temp1 = ""
+                // To check if affiliation is displayed; indicating 1st execution of application is complete
+                if (document.getElementsByTagName("li").length == 0) {
+                    initial_datasort();
+                }
+                // Sort Junior leads
+                author_list["Junior Lead"].sort(function(a, b) {
+                    return ( a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)) ;
+                })
+                for (k = 0; k < author_list["Junior Lead"].length; k++) {
+                    temp1 = "";
+                    for (i = 0; i < author_list["Junior Lead"][k][3].length; i++) {
+                        temp1 = temp1.concat(affiliation_list.indexOf(author_list["Junior Lead"][k][3][i].trim()) + 1, " , ");
+
+                    }
+                    temp1 = temp1.slice(0, -2)
+                    act = act.concat(author_list["Junior Lead"][k][0] + " " + author_list["Junior Lead"][k][2] + "<sup>" + temp1 + "</sup>" + ", ")
+                }
+
+                // Add all authors to same list
+                temp = []
+                for (j = 1; j < hierarchy.length - 1; j++) {
+                    for (k = 0; k < author_list[hierarchy[j]].length; k++) {
+                        temp.push(author_list[hierarchy[j]][k])
+                    }
+                }
+                // Sort all authors
+                temp.sort(function(a, b) {
+                    return ( a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)) ;
+                })
+                for (k = 0; k < temp.length; k++) {
+                    temp1 = "";
+                    for (i = 0; i < temp[k][3].length; i++) {
+                        temp1 = temp1.concat(affiliation_list.indexOf(temp[k][3][i].trim()) + 1, " , ");
+                    }
+                    temp1 = temp1.slice(0, -2)
+                    act = act.concat(temp[k][0] + " " + temp[k][2] + "<sup>" + temp1 + "</sup>" + ", ")
+                }
+
+                // Sort Senior leads
+                author_list["Senior Lead"].sort(function(a, b) {
+                    return ( a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)) ;
+                })
+                for (k = 0; k < author_list["Senior Lead"].length; k++) {
+                    temp1 = "";
+                    for (i = 0; i < author_list["Senior Lead"][k][3].length; i++) {
+                        temp1 = temp1.concat(affiliation_list.indexOf(author_list["Senior Lead"][k][3][i].trim()) + 1, " , ");
+                    }
+                    temp1 = temp1.slice(0, -2)
+                    act = act.concat(author_list["Senior Lead"][k][0] + " " + author_list["Senior Lead"][k][2] + "<sup>" + temp1 + "</sup>" + ", ")
+                }
+
+                // To remove last comma
+                act = act.slice(0, -2)
+                document.getElementById("Panel_1").innerHTML = act;
+            }
+
+            function initial_datasort() {
+                var act = "";
+                var aff = "";
+                var role = "";
+                var contri_list = {}
+                var temp = []
+                var val
+                var flag;
+                // Read local json file
+                actual_JSON = loadJSON();
+
+                // Create object of empty list for each role type
+                for (j = 0; j < hierarchy.length; j++) {
+                    author_list[hierarchy[j]] = []
+                    contri_list[hierarchy[j]] = []
+                }
+
+                // Access the json object read from local json file
+                for (i = 0; i < actual_JSON.length; i++) {
+                    flag = false
+                    role = actual_JSON[i]['Role'];
+                    role = role.split(',');
+
+                    // Gather all affiliations
+                    affili = actual_JSON[i]['Affiliations'];
+                    affili = affili.split(';')
+                    for (var k = 0; k < affili.length; k++) {
+                        if (affiliation_list.indexOf(affili[k].trim()) < 0) {
+                            affiliation_list.push(affili[k].trim());
+                        }
+                    }
+
+                    //  Get the most important role of the author based on hierarchy in hierarchy list
+                    var final_list = []
+                    for (j = 0; j < hierarchy.length; j++) {
+                        if (role.indexOf(hierarchy[j]) > -1) {
+                            contri_list[hierarchy[j]].push(actual_JSON[i]['Name'])
+                            if (!flag) {
+                                actual_JSON[i]['Role'] = hierarchy[j];
+                                temp = [actual_JSON[i]['Name'], actual_JSON[i]['Role'], actual_JSON[i]['Qual'], affili, role]
+                                author_list[hierarchy[j]].push(temp)
+                                flag = true
+                            }
+                        }
+                    }
+                }
+
+                // Sort affiliation list and display as list
+                affiliation_list.sort();
+                if (document.getElementsByTagName("li").length == 0) {
+                    var list = document.getElementById('Affiliations');
+                    for (var i = 0; i < affiliation_list.length; i++) {
+                        entry = document.createElement('li');
+                        entry.appendChild(document.createTextNode(affiliation_list[i]));
+                        list.appendChild(entry);
+                    }
+                }
+
+                // Adding contribution section
+                temp = "";
+                var text1 = " are the "
+                var text3 = " is the "
+                var text2 = " of the project "
+                for (var i = 0; i < hierarchy.length; i++) {
+                    for (var j = 0; j < contri_list[hierarchy[i]].length; j++) {
+                        if (j == 0) {
+                            temp = temp + contri_list[hierarchy[i]][j].match(/\b(\w)/g).join('.');
+                        } else {
+                            temp = temp + ' , ' + contri_list[hierarchy[i]][j].match(/\b(\w)/g).join('.');
+                        }
+                    }
+                    if (contri_list[hierarchy[i]].length == 1) {
+                        temp = temp + text3 + hierarchy[i] + text2 + '. '
+                    } else {
+                        temp = temp + text1 + hierarchy[i] + 's' + text2 + '. '
+                    }
+                }
+
+                temp = temp.slice(0, -2)
+                document.getElementById("Panel_2").innerHTML = temp;
+            }
+
+            function loadJSON() {
+                var json = null;
+                $.ajax({
+                    'async': false,
+                    'global': false,
+                    'url': 'authors.json',
+                    'dataType': "json",
+                    'success': function(data) {
+                        json = data;
+                    }
+                });
+                return json;
+            }
+        </script>
+    </body>
+</html>
