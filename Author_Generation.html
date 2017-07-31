@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+    </head>
+    <body>
+    <span style='font-weight: bold;'>Project name:</span> <input type="text" id="Projectname" required><br>
+        <form name="form1">            
+            <input type="radio" name="format_pref" value="alphabetically">
+            Course grained sort<br>
+            <input type="radio" name="format_pref" value="hierarchy" checked>
+            Fine grained sort<br>
+        </form>
+        <button onclick="gen_clicked()">Generate List</button>
+        <div class="panel panel-default">
+            <div class="panel-heading"><span style='font-weight: bold;'>Author list</span></div>
+            <div class="panel-body" id="Panel_1"></div>
+        </div>
+        <div class="panel panel-default">
+            <div class="panel-heading"><span style='font-weight: bold;'>Affiliation List</span></div>
+            <div class="panel-body"></div>
+            <ol id="Affiliations"></ol>
+        </div>
+        <!-- <ol id="Affiliations"></ol> -->
+        <div class="panel panel-default">
+            <div class="panel-heading"><span style='font-weight: bold;'>Contribution</span></div>
+            <div class="panel-body" id="Panel_2"></div>
+        </div>
+        <script src="http://ajax.aspnetcdn.com/ajax/jquery/jquery-1.7.js"></script>
+        <script>
+            var const_array = ['HasPJuniorLead (L)', 'HasPSeniorLead (L)', 'HasPSpecialContributor (L)', 'HasPI (L)', 'HasInvestigator (L)','HasTitle (L)','IsAffiliatedWith (L)','HasCohort (L)','JuniorLead','SeniorLead'];
+            var author_list = {};
+            var affiliation_list = [];
+            
+             function data_fetch(proj_name) {
+                // var data1 = get_facts_data('');
+
+                // Get the project facts
+                var proj_facts = get_facts_data(proj_name);
+                
+                if(Object.keys(proj_facts["wtfacts"]["facts"]).length<2){
+                    
+                    try {
+                          throw new Error('No details maintained for the project');
+                        } catch (e) {
+                          alert(e.message);
+                        }
+                }
+                else{
+                var proj_facts = proj_facts['wtfacts']['facts'];
+                var authors = [];
+                                
+                for (var i = 0; i < 3; i++){
+                    for(var j =0; j < proj_facts[const_array[i]]['values'].length; j++){
+
+                        // If author already exists in the list, add his additional role to role property
+                        if(const_array[i] in proj_facts){
+                        var auth_name = proj_facts[const_array[i]]['values'][j]['text'];
+                        authors = appendAuthor(i,auth_name,authors,4);
+                    }
+                    }
+                }
+                
+                // Extract PI and investigator details from Cohort properties
+                for (var i = 0; i< proj_facts[const_array[7]]['values'].length; i++){
+                    var cohort = proj_facts[const_array[7]]['values'][i]['val'];
+                    var cohort_facts = get_facts_data(cohort);
+
+                    // Get PI names
+                    if(const_array[3] in cohort_facts['wtfacts']['facts']){
+                    for (var j = 0; j < cohort_facts['wtfacts']['facts'][const_array[3]]['values'].length; j++){
+                        var auth_name = cohort_facts['wtfacts']['facts'][const_array[3]]['values'][j]['text'];
+                        authors = appendAuthor(3,auth_name,authors,3);
+                    }
+                    }
+                    // Get investigator names
+                    if(const_array[4] in cohort_facts['wtfacts']['facts']){
+                    for (var j = 0; j < cohort_facts['wtfacts']['facts'][const_array[4]]['values'].length; j++){
+                        var auth_name = cohort_facts['wtfacts']['facts'][const_array[4]]['values'][j]['text'];
+                        authors = appendAuthor(4,auth_name,authors,3);
+                    }
+                }
+               }
+
+               // Get person details 
+               for (var i =0; i<authors.length; i++){
+                    var auth_name = authors[i]['Name'];
+                    var person_data = get_facts_data(auth_name.split(' ').join('_'));
+                    var a = 1;
+                    var ind = authors.map(function(e) { return e.Name; }).indexOf(auth_name); 
+                    if(const_array[5] in person_data["wtfacts"]["facts"]){
+                        authors[ind]["Qual"] = person_data["wtfacts"]["facts"][const_array[5]]['values'][0]['text']; 
+                    }  
+                    if(const_array[6] in person_data["wtfacts"]["facts"]){
+                        authors[ind]["Affiliations"] = person_data["wtfacts"]["facts"][const_array[6]]['values'][0]['text'];
+                    }
+
+               }
+               return authors;
+           // }
+             }}
+
+             // Check if a author name exists in the authors array
+             function hasValue(obj, key, value,slice_cnt) {
+                return obj.hasOwnProperty(key) && obj[key] === value;
+                }
+
+            function appendAuthor(i,auth_name,authors,slice_cnt){
+                    // Check if the author exists in the list
+                        if(authors.some(function(auth_exist) { return hasValue(auth_exist, 'Name', auth_name ); })){
+                            // Find index and add the role to the exisiting role
+                            var ind = authors.map(function(e) { return e.Name; }).indexOf(auth_name);
+                            authors[ind]['Role'] = authors[ind]['Role']+','+const_array[i].slice(4,const_array[i].indexOf(' '));
+                        }
+                        else{
+                        var author_det = {};
+                        author_det.Name =   auth_name;
+                        author_det.Role = const_array[i].slice(slice_cnt,const_array[i].indexOf(' '))  ;
+                        authors.push(author_det);
+                        }
+                        return authors    
+
+            }
+
+             function get_facts_data(title){
+              var query = 'http://organicdatacuration.org/enigma/api.php?action=wtfacts&operation=show&title='+title+'&format=json';
+              var facts = null;
+                $.ajax({
+                    'async': false,
+                    'global': false,
+                    'url': query,
+                    'dataType': "json",
+                    'success': function(data) {
+                        facts = data;
+                    }
+                });
+                return facts;
+             }
+
+            // To check if affiliation is displayed; indicating 1st execution of application is complete
+
+            var actual_JSON = {};
+            var hierarchy = ["JuniorLead", "SpecialContributor", "Investigator", "PI", "SeniorLead"];
+            var author_list = {};
+            var affiliation_list = [];
+
+            function gen_clicked() {
+                if(document.getElementById("Projectname").value == ""){
+                    alert("Project name should be provided")
+                }
+                else{
+                proj_name = document.getElementById("Projectname").value;
+                for (var i = 0; i < form1.getElementsByTagName('input').length; i++) {
+                    if (document.getElementsByName("format_pref")[i].checked) {
+                        val = document.getElementsByName("format_pref")[i].value
+                    }
+                }
+                if (val == "hierarchy") {
+                    sort_hierarchy(proj_name)
+                } else if (val == "alphabetically") {
+                    sort_alpha(proj_name)
+                }
+            }
+        }
+
+            function sort_hierarchy(proj_name) {
+                // Arrange the authors in each category alphabetically
+                var act = "";
+                var temp = [];
+                if (document.getElementsByTagName("li").length == 0) {
+                    initial_datasort(proj_name);
+                }
+
+                for (j = 0; j < hierarchy.length; j++) {
+
+                    // The Junior and Senior leads should not be alphabetically sorted
+                    if(j !=0 & j!=hierarchy.length-1 ){
+                    author_list[hierarchy[j]].sort(function(a, b) {
+                        return ( a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)) ;
+                    })}
+                    // Format the authors in display format
+                    for (k = 0; k < author_list[hierarchy[j]].length; k++) {
+                        temp = ""
+                        for (i = 0; i < author_list[hierarchy[j]][k][3].length; i++) {
+                            temp = temp.concat(affiliation_list.indexOf(author_list[hierarchy[j]][k][3][i].trim()) + 1, " , ");
+                        }
+                        temp = temp.slice(0, -2)
+                        act = act.concat(author_list[hierarchy[j]][k][0] + " " + author_list[hierarchy[j]][k][2] + "<sup>" + temp + "</sup>" + ", ")
+
+                    }
+                }
+                // To remove last comma
+                act = act.slice(0, -2)
+                document.getElementById("Panel_1").innerHTML = act;
+            }
+            function sort_alpha(proj_name) {
+                var act = "";
+                var temp = [];
+                // Check the type of sorting needed
+
+                var temp1 = ""
+                if (document.getElementsByTagName("li").length == 0) {
+                    initial_datasort(proj_name);
+                }
+                // Sort Junior leads
+                // Junior Leads are not sorted
+/*                author_list["Junior Lead"].sort(function(a, b) {
+                    return ( a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)) ;
+                })*/
+                for (k = 0; k < author_list[const_array[8]].length; k++) {
+                    temp1 = "";
+                    for (i = 0; i < author_list[const_array[8]][k][3].length; i++) {
+                        temp1 = temp1.concat(affiliation_list.indexOf(author_list[const_array[8]][k][3][i].trim()) + 1, " , ");
+
+                    }
+                    temp1 = temp1.slice(0, -2)
+                    act = act.concat(author_list[const_array[8]][k][0] + " " + author_list[const_array[8]][k][2] + "<sup>" + temp1 + "</sup>" + ", ")
+                }
+
+                // Add all authors to same list
+                temp = []
+                for (j = 1; j < hierarchy.length - 1; j++) {
+                    for (k = 0; k < author_list[hierarchy[j]].length; k++) {
+                        temp.push(author_list[hierarchy[j]][k])
+                    }
+                }
+                // Sort all authors
+                temp.sort(function(a, b) {
+                    return ( a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)) ;
+                })
+                for (k = 0; k < temp.length; k++) {
+                    temp1 = "";
+                    for (i = 0; i < temp[k][3].length; i++) {
+                        temp1 = temp1.concat(affiliation_list.indexOf(temp[k][3][i].trim()) + 1, " , ");
+                    }
+                    temp1 = temp1.slice(0, -2)
+                    act = act.concat(temp[k][0] + " " + temp[k][2] + "<sup>" + temp1 + "</sup>" + ", ")
+                }
+
+                // Sort Senior leads
+                // Senior leads are not sorted
+/*                author_list[const_array[9]].sort(function(a, b) {
+                    return ( a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)) ;
+                })*/
+                for (k = 0; k < author_list[const_array[9]].length; k++) {
+                    temp1 = "";
+                    for (i = 0; i < author_list[const_array[9]][k][3].length; i++) {
+                        temp1 = temp1.concat(affiliation_list.indexOf(author_list[const_array[9]][k][3][i].trim()) + 1, " , ");
+                    }
+                    temp1 = temp1.slice(0, -2)
+                    act = act.concat(author_list[const_array[9]][k][0] + " " + author_list[const_array[9]][k][2] + "<sup>" + temp1 + "</sup>" + ", ")
+                }
+
+                // To remove last comma
+                act = act.slice(0, -2)
+                document.getElementById("Panel_1").innerHTML = act;
+            }
+
+            function initial_datasort(proj_name) {
+                var act = "";
+                var aff = "";
+                var role = "";
+                var contri_list = {}
+                var temp = []
+                var val
+                var flag;
+                var affili;
+                // Read local json file
+                actual_JSON = data_fetch(proj_name);
+
+                // Create object of empty list for each role type
+                for (j = 0; j < hierarchy.length; j++) {
+                    author_list[hierarchy[j]] = []
+                    contri_list[hierarchy[j]] = []
+                }
+
+                // Access the json object read from local json file
+                for (i = 0; i < actual_JSON.length; i++) {
+                    flag = false
+                    role = actual_JSON[i]['Role'];
+                    role = role.split(',');
+
+                    // Gather all affiliations
+                    affili = null;
+                    if('Affiliations' in actual_JSON[i]){
+                    affili = actual_JSON[i]['Affiliations'];
+                    affili = affili.split(';')
+                    for (var k = 0; k < affili.length; k++) {
+                        if (affiliation_list.indexOf(affili[k].trim()) < 0) {
+                            affiliation_list.push(affili[k].trim());
+                        }
+                    }
+                }
+
+                    //  Get the most important role of the author based on hierarchy in hierarchy list
+                    var final_list = []
+                    for (j = 0; j < hierarchy.length; j++) {
+                        if (role.indexOf(hierarchy[j]) > -1) {
+                            contri_list[hierarchy[j]].push(actual_JSON[i]['Name'])
+                            if (!flag) {
+                                actual_JSON[i]['Role'] = hierarchy[j];
+                                temp = [actual_JSON[i]['Name'], actual_JSON[i]['Role']];                                
+                                if("Qual" in actual_JSON[i]){
+                                    temp.push(actual_JSON[i]['Qual']);
+                                }
+                                if(affili != null){
+                                    temp.push(affili);
+                                }
+                                temp.push(role);
+
+                                author_list[hierarchy[j]].push(temp);
+                                flag = true
+                            }
+                        }
+                    }
+                }
+
+                // Sort affiliation list and display as list
+                affiliation_list.sort();
+                if (document.getElementsByTagName("li").length == 0) {
+                    var list = document.getElementById('Affiliations');
+                    for (var i = 0; i < affiliation_list.length; i++) {
+                        entry = document.createElement('li');
+                        entry.appendChild(document.createTextNode(affiliation_list[i]));
+                        list.appendChild(entry);
+                    }
+                }
+
+                // Adding contribution section based on the roles as no data is available regarding the exact workof the author
+                temp = "";
+                var text1 = " are the "
+                var text3 = " is the "
+                var text2 = " of the project "
+                for (var i = 0; i < hierarchy.length; i++) {
+                    for (var j = 0; j < contri_list[hierarchy[i]].length; j++) {
+                        if (j == 0) {
+                            temp = temp + contri_list[hierarchy[i]][j].match(/\b\w/g).join('.');
+                        } else {
+                            temp = temp + ' , ' + contri_list[hierarchy[i]][j].match(/\b\w/g).join('.');
+                        }
+                    }
+                    if (contri_list[hierarchy[i]].length == 1) {
+                        temp = temp + text3 + hierarchy[i] + text2 + '. '
+                    } else {
+                        temp = temp + text1 + hierarchy[i] + 's' + text2 + '. '
+                    }
+                }
+
+                temp = temp.slice(0, -2)
+                document.getElementById("Panel_2").innerHTML = temp;
+            }
+       
+        </script>
+        </body>
+        </html>
